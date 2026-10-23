@@ -2,6 +2,26 @@ use super::*;
 use aquilum_core::settings::models::SyncSettings;
 
 #[test]
+fn connections_require_a_local_vault_for_copy_and_keep_remote_preview_read_only() {
+    let mut ctx = Context::new(1.0);
+    ctx.connections.connected = true;
+    ctx.connections.notes = vec!["Example.md".into()];
+    let copy_enabled = |ctx: &Context| blocks(Section::Connections, &AppConfig::default(), ctx).into_iter()
+        .flat_map(|b| b.rows).flat_map(|r| match r.control { Control::Buttons(buttons) => buttons, _ => Vec::new() })
+        .filter(|button| matches!(button.action, Action::ConnectionCopy(_))).map(|button| button.enabled).collect::<Vec<_>>();
+    assert!(copy_enabled(&ctx).iter().all(|on| !on));
+    ctx.workspace = Some(PathBuf::from("local"));
+    assert!(copy_enabled(&ctx).iter().all(|on| *on));
+    ctx.connections.preview = Some(aquilum_core::connections::Note { path: "Example.md".into(), content: "# Remote text".into(), next: None });
+    let preview = blocks(Section::Connections, &AppConfig::default(), &ctx);
+    assert_eq!(preview.len(), 1);
+    assert!(preview[0].rows.iter().all(|row| row.setter.is_none()));
+    assert!(preview[0].rows.iter().any(|row| matches!(&row.control, Control::Status { text, .. } if text == "# Remote text")));
+    ctx.connections.busy = true;
+    assert!(copy_enabled(&ctx).iter().all(|on| !on));
+}
+
+#[test]
 fn backend_settings_show_controls_and_clients_without_token_hashes() {
     use aquilum_core::client_api::{ClientApiStatus, ClientToken};
     let mut ctx = Context::new(1.0);
@@ -76,7 +96,7 @@ fn templates_and_attachments_share_one_section_and_search_tuning_lives_with_bm25
         assert_eq!(Section::from_key(old), Some(Section::Data), "сохранённый раздел «{old}» открывает общий раздел");
     }
     assert_eq!(Section::from_key("search"), Some(Section::Analysis));
-    assert_eq!(Section::ALL.len(), 12);
+    assert_eq!(Section::ALL.len(), 13);
 
     let rows = |config: &AppConfig| blocks(Section::Analysis, config, &ctx).into_iter().flat_map(|b| b.rows).map(|r| r.label).collect::<Vec<_>>();
     let pool = t("settings.search.candidatePool");

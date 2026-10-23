@@ -22,6 +22,8 @@ pub enum Setter {
     HomePage,
     Autostart,
     ClientApi(ClientApiField),
+    ConnectionAddress,
+    ConnectionQuery,
 }
 
 pub struct Context {
@@ -32,6 +34,7 @@ pub struct Context {
     pub client_api_config: Option<ClientApiConfig>,
     pub client_api_status: ClientApiStatus,
     pub client_api_clients: Vec<ClientToken>,
+    pub connections: aquilum_core::connections::Status,
     pub copied: Option<usize>,
     pub trash_page: usize,
     pub autostart: Option<bool>,
@@ -47,7 +50,7 @@ pub struct Context {
 impl Context {
     #[cfg(test)]
     pub fn new(scale: f64) -> Self {
-        Context { workspace: None, scale, home_page: String::new(), mcp: None, client_api_config: None, client_api_status: ClientApiStatus::default(), client_api_clients: Vec::new(), copied: None, trash_page: 0, autostart: None, update: None, sync: SyncStatus::Off(None), vault_sync: None, sync_large: Vec::new(), sync_size: Size::default(), sync_due: None, sync_last: None }
+        Context { workspace: None, scale, home_page: String::new(), mcp: None, client_api_config: None, client_api_status: ClientApiStatus::default(), client_api_clients: Vec::new(), connections: Default::default(), copied: None, trash_page: 0, autostart: None, update: None, sync: SyncStatus::Off(None), vault_sync: None, sync_large: Vec::new(), sync_size: Size::default(), sync_due: None, sync_last: None }
     }
 }
 
@@ -74,6 +77,13 @@ pub enum Action {
     BackendChooseWorkspace,
     BackendCreateToken,
     BackendRevokeToken(String),
+    ConnectionToken,
+    ConnectionBrowse(usize),
+    ConnectionRead(String, usize),
+    ConnectionBack,
+    ConnectionCopy(Option<String>),
+    ConnectionDisconnect,
+    ConnectionShowFolder,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

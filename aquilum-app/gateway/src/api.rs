@@ -59,6 +59,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/health", get(health))
         .route("/api/notes", get(notes))
         .route("/api/note", get(note))
+        .route("/api/export", get(export))
         .route("/api/outline", get(outline))
         .route("/api/search", get(search))
         .route("/api/backlinks", get(backlinks))
@@ -350,6 +351,14 @@ async fn note(
         args["heading"] = json!(heading);
     }
     Ok(Json(state.call("read_note", args).await?))
+}
+
+async fn export(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<PathQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let path = validate_path(&state.config.workspace, &query.path, true)?;
+    Ok(Json(state.call("read_note", json!({"note": path, "snapshot": true})).await?))
 }
 
 async fn outline(

@@ -3,6 +3,7 @@
 
 pub mod app_core;
 pub mod client_api;
+pub mod connections;
 pub mod documents;
 pub mod files;
 pub mod history;

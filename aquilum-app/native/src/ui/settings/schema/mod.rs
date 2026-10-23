@@ -12,6 +12,7 @@ use crate::interface::{MAX_SCALE, MIN_SCALE, SCALE_STEP};
 
 mod appearance;
 mod backend;
+mod connections;
 mod data;
 mod mcp;
 mod section;
@@ -46,6 +47,7 @@ pub fn blocks(section: Section, config: &AppConfig, ctx: &Context) -> Vec<Block>
         Section::Analysis => analysis(config),
         Section::Mcp => mcp(config, ctx),
         Section::Backend => backend::backend(ctx),
+        Section::Connections => connections::connections(ctx),
         Section::History => history(config, ctx),
         Section::Trash => trash(config, ctx),
         Section::Sync => sync(config, ctx),

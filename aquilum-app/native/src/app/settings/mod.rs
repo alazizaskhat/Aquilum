@@ -64,6 +64,7 @@ impl App {
             client_api_config,
             client_api_status: self.workspace.core.client_api.status(),
             client_api_clients: self.workspace.core.client_api.clients(),
+            connections: self.workspace.core.connections.status(),
             copied,
             trash_page,
             autostart: crate::autostart::available().then(crate::autostart::enabled),

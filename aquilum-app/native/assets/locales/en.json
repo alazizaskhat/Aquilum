@@ -226,7 +226,8 @@
       "trash": "Trash",
       "sync": "Sync",
       "system": "System",
-      "shortcuts": "Keyboard shortcuts"
+      "shortcuts": "Keyboard shortcuts",
+      "connections": "Connections"
     },
     "font": {
       "section": "Fonts",
@@ -521,6 +522,35 @@
       "nextPage": "Next page",
       "previousPage": "Previous page",
       "closeReader": "Close reader"
+    },
+    "connections": {
+      "section": "Other computers",
+      "address": "API address",
+      "addressHint": "Use the other PC's HTTPS address, for example https://example.com/notes-api/",
+      "token": "Client access",
+      "chooseToken": "Choose token file",
+      "status": "Connection",
+      "working": "Working…",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "connect": "Connect / Refresh",
+      "disconnect": "Disconnect / Cancel",
+      "copyAll": "Copy all notes",
+      "copyHint": "Copies Markdown notes into a new Imported folder in the current vault. Existing notes stay intact. Attachments, history and automatic sync are not included. Both PCs must be online with Aquilum running.",
+      "error": "Connection error",
+      "copied": "Copied {{count}} notes",
+      "showFolder": "Show folder",
+      "filter": "Filter by title",
+      "count": "{{count}} remote notes",
+      "previous": "Previous",
+      "next": "Next",
+      "read": "Read",
+      "copy": "Copy locally",
+      "notes": "Remote notes",
+      "readOnly": "Read-only remote preview. Refresh to fetch the latest text.",
+      "refresh": "Refresh",
+      "preview": "Remote note",
+      "back": "Back to notes"
     }
   },
   "window": {

@@ -37,6 +37,57 @@ fn settings_dialog_applies_changes() {
 }
 
 #[test]
+fn connections_dialog_browses_reads_and_copies_through_the_backend() {
+    let mut h = Harness::new();
+    let core = h.app.workspace.core.clone();
+    core.client_api.configure(&core, |config| {
+        config.bind.set_port(0);
+        config.workspace = h.vault.path().to_path_buf();
+    }).unwrap();
+    assert!(wait_until(400, 10, || !core.client_api.status().busy));
+    let token = h._data.path().join("laptop.token");
+    core.client_api.create_token("laptop", &token).unwrap();
+    core.client_api.configure(&core, |config| config.enabled = true).unwrap();
+    assert!(wait_until(400, 10, || !core.client_api.status().busy));
+    core.connections.configure(|config| {
+        config.address = format!("http://{}/api/", core.client_api.status().address.unwrap());
+        config.token_file = Some(token);
+    });
+    h.app.open_settings(&mut h.root);
+    h.open_section(Section::Connections);
+    let browse = h.binding("connect", |b| matches!(b, Binding::Button(Action::ConnectionBrowse(0))));
+    h.act(browse, crate::ui::widgets::Pressed);
+    assert!(wait_until(400, 10, || {
+        h.step();
+        !core.connections.status().busy && matches!(&h.app.popup, Some(Popup::Settings { dialog, .. })
+            if dialog.bindings.values().any(|b| matches!(b, Binding::Button(Action::ConnectionRead(path, 0)) if path == "a.md")))
+    }));
+    assert!(core.connections.status().connected);
+    let read = h.binding("read a.md", |b| matches!(b, Binding::Button(Action::ConnectionRead(path, 0)) if path == "a.md"));
+    h.act(read, crate::ui::widgets::Pressed);
+    assert!(wait_until(400, 10, || {
+        h.step();
+        !core.connections.status().busy && matches!(&h.app.popup, Some(Popup::Settings { dialog, .. })
+            if dialog.bindings.values().any(|b| matches!(b, Binding::Button(Action::ConnectionBack))))
+    }));
+    assert_eq!(core.connections.status().preview.unwrap().path, "a.md");
+    let copy = h.binding("copy a.md", |b| matches!(b, Binding::Button(Action::ConnectionCopy(Some(path))) if path == "a.md"));
+    h.act(copy, crate::ui::widgets::Pressed);
+    assert!(wait_until(400, 10, || { h.step(); !core.connections.status().busy }));
+    let status = core.connections.status();
+    assert!(status.error.is_none(), "{:?}", status.error);
+    assert_eq!(status.copied, 1);
+    assert_eq!(std::fs::read(status.destination.unwrap().join("a.md")).unwrap(), std::fs::read(h.vault.path().join("a.md")).unwrap());
+    let back = h.binding("back", |b| matches!(b, Binding::Button(Action::ConnectionBack)));
+    h.act(back, crate::ui::widgets::Pressed);
+    assert!(core.connections.status().preview.is_none());
+    let disconnect = h.binding("disconnect", |b| matches!(b, Binding::Button(Action::ConnectionDisconnect)));
+    h.act(disconnect, crate::ui::widgets::Pressed);
+    assert!(!core.connections.status().connected);
+    assert_eq!(h.section(), Some(Section::Connections));
+}
+
+#[test]
 fn trash_section_restores_deleted_note() {
     let mut h = Harness::new();
     let vault = h.vault.path().to_path_buf();

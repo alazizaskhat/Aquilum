@@ -62,3 +62,44 @@ fn snapshot_backend_settings() {
         }
     }
 }
+
+#[test]
+#[ignore = "connections visual review"]
+fn snapshot_connections() {
+    let _theme = crate::ui::theme::test_lock();
+    let vault = crate::test_dir::tempdir();
+    let data = crate::test_dir::tempdir();
+    for language in ["en", "ru"] {
+        crate::i18n::set_language(language);
+        for mode in ["light", "dark"] {
+            crate::ui::theme::apply_setting(mode, false, "");
+            for preview in [false, true] {
+                let (mut root, _) = crate::ui::snapshot::shell(vault.path(), data.path());
+                let mut ctx = Context::new(1.0);
+                ctx.workspace = Some(vault.path().to_path_buf());
+                ctx.connections.config.address = "https://example.com/notes-api/".into();
+                ctx.connections.config.token_file = Some("C:/Users/Me/Documents/laptop.token".into());
+                ctx.connections.connected = true;
+                ctx.connections.notes = vec!["Projects/Research.md".into(), "Дневник/Заметка.md".into()];
+                ctx.connections.total = 2;
+                if preview {
+                    ctx.connections.preview = Some(aquilum_core::connections::Note {
+                        path: "Projects/Research.md".into(),
+                        content: "# Research notes\n\nThis text is read directly from the other computer.\n\n## Next steps\n\n- Review the results\n- Copy this note into the local vault\n\nДлинные заметки читаются постранично. Локальные файлы сохраняются.".into(),
+                        next: Some(4000),
+                    });
+                }
+                let (layer, dialog) = settings::dialog(&AppConfig::default(), &ctx, Section::Connections);
+                root.add_layer(layer, Point::ORIGIN);
+                root.run_rewrite_passes();
+                root.handle_window_event(masonry::core::WindowEvent::AnimFrame(std::time::Duration::from_secs(1)));
+                let part = if preview { "preview" } else { "connection" };
+                crate::ui::snapshot::save(&mut root, &format!("connections-{language}-{mode}-{part}"));
+                if !preview {
+                    dialog.content.edit(&mut root, |mut scroll| crate::ui::scroll::ScrollArea::set_offset(&mut scroll, 10000.0));
+                    crate::ui::snapshot::save(&mut root, &format!("connections-{language}-{mode}-notes"));
+                }
+            }
+        }
+    }
+}

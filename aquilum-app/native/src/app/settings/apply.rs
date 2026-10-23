@@ -5,6 +5,37 @@ impl App {
         let core = &self.workspace.core;
         let workspace = self.tree.root().map(Path::to_path_buf);
         match action {
+            Action::ConnectionToken => {
+                if let Some(path) = rfd::FileDialog::new().set_title(t("settings.connections.chooseToken")).add_filter("Aquilum token", &["token"]).pick_file() {
+                    core.connections.configure(|config| config.token_file = Some(path));
+                }
+                Effect::Content
+            }
+            Action::ConnectionBrowse(offset) => {
+                core.connections.start(core, aquilum_core::connections::Job::Browse(offset));
+                Effect::Content
+            }
+            Action::ConnectionRead(path, offset) => {
+                dialog.content.edit(root, |mut area| crate::ui::scroll::ScrollArea::set_offset(&mut area, 0.0));
+                core.connections.start(core, aquilum_core::connections::Job::Read(path, offset));
+                Effect::Content
+            }
+            Action::ConnectionBack => {
+                core.connections.back();
+                dialog.content.edit(root, |mut area| crate::ui::scroll::ScrollArea::set_offset(&mut area, 0.0));
+                Effect::Content
+            }
+            Action::ConnectionCopy(note) => {
+                if let Some(workspace) = workspace {
+                    core.connections.start(core, aquilum_core::connections::Job::Copy { workspace, note });
+                }
+                Effect::Content
+            }
+            Action::ConnectionDisconnect => { core.connections.disconnect(); Effect::Content }
+            Action::ConnectionShowFolder => {
+                if let Some(path) = core.connections.status().destination { system::open(&path.to_string_lossy()); }
+                Effect::None
+            }
             Action::BackendRestart => {
                 if let Err(error) = core.client_api.request_apply(core) { core.client_api.record_error(error); }
                 Effect::Content
@@ -126,6 +157,18 @@ impl App {
 
     pub(super) fn apply(&mut self, setter: Setter, value: Value) -> Effect {
         match setter {
+            Setter::ConnectionAddress => {
+                if let Value::Text(address) = value { self.workspace.core.connections.configure(|config| config.address = address.trim().to_owned()); }
+                Effect::Content
+            }
+            Setter::ConnectionQuery => {
+                if let Value::Text(query) = value {
+                    let core = &self.workspace.core;
+                    core.connections.query(query);
+                    core.connections.start(core, aquilum_core::connections::Job::Browse(0));
+                }
+                Effect::Content
+            }
             Setter::ClientApi(field) => {
                 use aquilum_core::client_api::ClientApiField;
                 let core = &self.workspace.core;

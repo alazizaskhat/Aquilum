@@ -29,6 +29,7 @@ pub enum CoreEvent {
     Navigate(Navigation),
     SyncChanged,
     ClientApiChanged,
+    ConnectionsChanged,
     Settle(std::sync::mpsc::SyncSender<()>),
 }
 
@@ -66,6 +67,7 @@ pub struct Core {
     pub active_note: ActiveNote,
     pub mcp: McpServer,
     pub client_api: crate::client_api::ClientApi,
+    pub connections: crate::connections::Connections,
     pub sync: SyncService,
     events: Arc<dyn EventSink>,
 }
@@ -94,6 +96,7 @@ impl Core {
                 active_note: ActiveNote::default(),
                 mcp: McpServer::new(),
                 client_api: crate::client_api::ClientApi::new(app_data_dir),
+                connections: crate::connections::Connections::new(app_data_dir),
                 sync: SyncService::new(app_data_dir),
                 events,
             }
@@ -119,6 +122,7 @@ impl Core {
     }
 
     pub fn shutdown(&self) {
+        self.connections.close();
         self.client_api.shutdown();
         self.mcp.shutdown();
         self.watcher.close();

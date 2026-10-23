@@ -25,6 +25,16 @@ pub(super) fn read_note(core: &Core, arguments: &Value) -> Result<Value, String>
 
 pub(super) fn read_one(vault: &Vault, name: &str, arguments: &Value, size: usize) -> Result<Value, String> {
     let note = vault.note(name)?;
+    // A single bounded read for device copies, avoiding mixed paginated versions.
+    if flag(arguments, "snapshot", false) {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        std::fs::File::open(&note).map_err(|e| e.to_string())?
+            .take(8 * 1024 * 1024 + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+        if bytes.len() > 8 * 1024 * 1024 { return Err("Note exceeds the 8 MiB copy limit".into()); }
+        let content = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+        return Ok(json!({ "path": vault.relative(&note), "content": content }));
+    }
     let failed = |error: std::io::Error| error.to_string();
     let meta = super::super::frontmatter::map(&read_head(&note).map_err(failed)?);
     let (section, heading) = match optional_text(arguments, "heading").as_deref() {

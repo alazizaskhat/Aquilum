@@ -38,6 +38,7 @@ impl App {
                 CoreEvent::Navigate(navigation) => navigations.push(navigation),
                 CoreEvent::SyncChanged => self.refresh_section(root, crate::ui::settings::schema::Section::Sync),
                 CoreEvent::ClientApiChanged => self.refresh_section(root, crate::ui::settings::schema::Section::Backend),
+                CoreEvent::ConnectionsChanged => self.refresh_section(root, crate::ui::settings::schema::Section::Connections),
                 CoreEvent::Settle(done) => {
                     if let Some(note) = &mut self.note {
                         note.flush(&self.workspace.core, &self.text);

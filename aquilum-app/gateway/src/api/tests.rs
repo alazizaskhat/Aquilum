@@ -110,6 +110,21 @@ async fn no_token_wrong_token_duplicate_headers_and_query_token_are_rejected() {
 }
 
 #[tokio::test]
+async fn export_requires_a_token_and_rejects_writes_and_paths_outside_the_vault() {
+    let f = Fixture::new();
+    assert_eq!(f.send(Request::builder().uri("/api/export?path=Example.md")).await.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(f.send(f.request("/api/export?path=Example.md").method(Method::POST)).await.status(), StatusCode::METHOD_NOT_ALLOWED);
+    for path in ["../secret.md", "/absolute.md", "C:/secret.md", ".aquilum/config.md"] {
+        let mut url = url::Url::parse("http://localhost/api/export").unwrap();
+        url.query_pairs_mut().append_pair("path", path);
+        let uri = format!("{}?{}", url.path(), url.query().unwrap());
+        let response = f.send(f.request(&uri)).await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{path}");
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    }
+}
+
+#[tokio::test]
 async fn writes_untrusted_origins_and_workspace_injection_are_rejected() {
     let f = Fixture::new();
     for method in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
