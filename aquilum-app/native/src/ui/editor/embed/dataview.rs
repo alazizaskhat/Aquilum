@@ -154,7 +154,7 @@ pub fn dataview(grid: &Fetch<Grid>, available: f64, make: &mut dyn FnMut(&Spec) 
     let height = y + PAD - CELL_Y;
     items.extend(card(span + side * 2.0, height));
     items.extend(body);
-    Drawing { height, items, hits }
+    Drawing { height, viewport: None, items, hits }
 }
 
 fn column_widths(grid: &Grid, inner: f64, make: &mut dyn FnMut(&Spec) -> Layout<BrushIndex>) -> Vec<f64> {

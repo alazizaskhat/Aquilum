@@ -54,6 +54,9 @@ impl TextEditor {
     fn code_at(&self, point: Point) -> Option<(Code, f64)> {
         let fonts = self.doc.markdown.as_ref()?;
         let code = self.code(self.index_at(point).filter(|&i| self.doc.block(i).is_code())?, fonts);
+        if self.doc.paragraph(code.first).fold == Fold::Head {
+            return None;
+        }
         code.panel.contains(point).then_some((code, panel::header(fonts.line)))
     }
 
@@ -176,7 +179,7 @@ impl TextEditor {
             self.code_bar(&code).paint(painter, &span);
         }
         if let (Fold::Below, Some(View::Drawing(preview))) = (self.doc.paragraph(code.last).fold, self.doc.paragraph(code.first).embed.map(|e| &e.view)) {
-            preview.paint(painter, self.embed_x(code.first), code.panel.y1 - preview.height, palette, None, None);
+            preview.paint(painter, self.embed_x(code.first), code.panel.y1 - preview.height, palette, None, None, self.table_scroll_x(start));
         }
         let baseline = |layout: &Layout<BrushIndex>| layout.lines().next().map_or(0.0, |line| f64::from(line.metrics().baseline));
         for j in self.shown(&code.body).filter(|_| code.digits > 0) {

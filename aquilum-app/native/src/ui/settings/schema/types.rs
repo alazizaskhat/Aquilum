@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use aquilum_core::mcp::McpStatus;
+use aquilum_core::client_api::{ClientApiConfig, ClientApiField, ClientApiStatus, ClientToken};
 use aquilum_core::settings::models::{AppConfig, SyncSettings};
 use aquilum_core::sync::{Large, Size, SyncStatus};
 
@@ -20,6 +21,7 @@ pub enum Setter {
     Scale,
     HomePage,
     Autostart,
+    ClientApi(ClientApiField),
 }
 
 pub struct Context {
@@ -27,6 +29,9 @@ pub struct Context {
     pub scale: f64,
     pub home_page: String,
     pub mcp: Option<McpStatus>,
+    pub client_api_config: Option<ClientApiConfig>,
+    pub client_api_status: ClientApiStatus,
+    pub client_api_clients: Vec<ClientToken>,
     pub copied: Option<usize>,
     pub trash_page: usize,
     pub autostart: Option<bool>,
@@ -42,7 +47,7 @@ pub struct Context {
 impl Context {
     #[cfg(test)]
     pub fn new(scale: f64) -> Self {
-        Context { workspace: None, scale, home_page: String::new(), mcp: None, copied: None, trash_page: 0, autostart: None, update: None, sync: SyncStatus::Off(None), vault_sync: None, sync_large: Vec::new(), sync_size: Size::default(), sync_due: None, sync_last: None }
+        Context { workspace: None, scale, home_page: String::new(), mcp: None, client_api_config: None, client_api_status: ClientApiStatus::default(), client_api_clients: Vec::new(), copied: None, trash_page: 0, autostart: None, update: None, sync: SyncStatus::Off(None), vault_sync: None, sync_large: Vec::new(), sync_size: Size::default(), sync_due: None, sync_last: None }
     }
 }
 
@@ -64,6 +69,11 @@ pub enum Action {
     OpenUrl(&'static str),
     CheckUpdates,
     InstallUpdate,
+    BackendRestart,
+    BackendRefresh,
+    BackendChooseWorkspace,
+    BackendCreateToken,
+    BackendRevokeToken(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

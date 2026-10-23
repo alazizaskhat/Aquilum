@@ -2,6 +2,7 @@
 //! knowledge of the UI that hosts it.
 
 pub mod app_core;
+pub mod client_api;
 pub mod documents;
 pub mod files;
 pub mod history;

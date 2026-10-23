@@ -2,6 +2,21 @@ use super::*;
 use aquilum_core::settings::models::SyncSettings;
 
 #[test]
+fn backend_settings_show_controls_and_clients_without_token_hashes() {
+    use aquilum_core::client_api::{ClientApiStatus, ClientToken};
+    let mut ctx = Context::new(1.0);
+    ctx.client_api_status = ClientApiStatus { configured: true, running: true, address: Some("127.0.0.1:8790".into()), ..Default::default() };
+    ctx.client_api_clients = vec![ClientToken { name: "phone".into(), enabled: true }];
+    let blocks = blocks(Section::Backend, &AppConfig::default(), &ctx);
+    assert_eq!(Section::from_key("backend"), Some(Section::Backend));
+    let rows: Vec<_> = blocks.iter().flat_map(|block| &block.rows).collect();
+    assert!(rows.iter().any(|row| matches!(row.setter, Some(Setter::ClientApi(_)))));
+    assert!(rows.iter().any(|row| matches!(&row.control, Control::Buttons(buttons) if buttons.iter().any(|button| matches!(&button.action, Action::BackendRevokeToken(name) if name == "phone")))));
+    assert!(rows.iter().any(|row| matches!(&row.control, Control::Buttons(buttons) if buttons.iter().any(|button| button.action == Action::BackendRestart))));
+    assert!(rows.iter().all(|row| row.code.is_none()));
+}
+
+#[test]
 fn numbers_parse_clamp_step_and_format() {
     let n = Number::new(1.6, 1.2, 2.0, 0.05);
     assert_eq!(n.parse("1,75"), Some(1.75));
@@ -61,7 +76,7 @@ fn templates_and_attachments_share_one_section_and_search_tuning_lives_with_bm25
         assert_eq!(Section::from_key(old), Some(Section::Data), "сохранённый раздел «{old}» открывает общий раздел");
     }
     assert_eq!(Section::from_key("search"), Some(Section::Analysis));
-    assert_eq!(Section::ALL.len(), 11);
+    assert_eq!(Section::ALL.len(), 12);
 
     let rows = |config: &AppConfig| blocks(Section::Analysis, config, &ctx).into_iter().flat_map(|b| b.rows).map(|r| r.label).collect::<Vec<_>>();
     let pool = t("settings.search.candidatePool");

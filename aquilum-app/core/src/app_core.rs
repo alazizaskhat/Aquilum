@@ -28,6 +28,7 @@ pub enum CoreEvent {
     LinksChanged(IndexRevision),
     Navigate(Navigation),
     SyncChanged,
+    ClientApiChanged,
     Settle(std::sync::mpsc::SyncSender<()>),
 }
 
@@ -64,6 +65,7 @@ pub struct Core {
     /// The note open in the UI, reported by the host; MCP tools use it for «эта заметка».
     pub active_note: ActiveNote,
     pub mcp: McpServer,
+    pub client_api: crate::client_api::ClientApi,
     pub sync: SyncService,
     events: Arc<dyn EventSink>,
 }
@@ -91,11 +93,13 @@ impl Core {
                 watcher: WorkspaceWatcher::new(watch_sink),
                 active_note: ActiveNote::default(),
                 mcp: McpServer::new(),
+                client_api: crate::client_api::ClientApi::new(app_data_dir),
                 sync: SyncService::new(app_data_dir),
                 events,
             }
         });
         core.sync.start(Arc::downgrade(&core));
+        core.client_api.apply(&core);
         core
     }
 
@@ -115,6 +119,7 @@ impl Core {
     }
 
     pub fn shutdown(&self) {
+        self.client_api.shutdown();
         self.mcp.shutdown();
         self.watcher.close();
         self.sync.close();

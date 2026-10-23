@@ -29,6 +29,7 @@ mod api;
 mod build;
 mod caret;
 mod code;
+mod drawing;
 mod edit;
 mod find;
 mod matching;

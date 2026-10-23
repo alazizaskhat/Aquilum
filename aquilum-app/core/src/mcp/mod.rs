@@ -3,7 +3,7 @@ pub mod bridge;
 mod protocol;
 mod server;
 mod stdio;
-mod tools;
+pub(crate) mod tools;
 mod vault;
 
 pub use stdio::run_stdio_bridge;

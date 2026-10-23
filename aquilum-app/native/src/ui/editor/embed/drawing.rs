@@ -3,7 +3,7 @@ use std::ops::Range;
 use masonry::core::{BrushIndex, render_text};
 use masonry::imaging::record::Glyph;
 use masonry::imaging::{Composite, GroupRef, PaintSink, Painter};
-use masonry::kurbo::{Affine, BezPath, Cap, Circle, Join, Point, Rect, RoundedRect, Stroke};
+use masonry::kurbo::{Affine, Axis, BezPath, Cap, Circle, Join, Point, Rect, RoundedRect, Stroke};
 use masonry::parley::Layout;
 use masonry::peniko::{BlendMode, Brush, BrushRef, Color, Fill, FontData, ImageBrush, Style};
 
@@ -11,6 +11,8 @@ use super::super::markdown;
 use super::metrics::COVER_RADIUS;
 use super::panel;
 use crate::ui::theme;
+use crate::ui::scroll::bar::{Scrollbar, Span};
+use crate::ui::tokens::size;
 
 const UNDERLINE: f64 = 1.0;
 const UNDERLINE_GAP: f64 = 2.0;
@@ -45,13 +47,20 @@ pub enum Action {
 
 pub struct Drawing {
     pub height: f64,
+    pub viewport: Option<(f64, f64)>,
     pub(super) items: Vec<Item>,
     pub hits: Vec<(Rect, Action, Option<f64>)>,
 }
 
 impl Drawing {
     pub(super) fn new(height: f64, items: Vec<Item>) -> Self {
-        Drawing { height, items, hits: Vec::new() }
+        Drawing { height, viewport: None, items, hits: Vec::new() }
+    }
+
+    pub fn scroll_span(&self, offset: f64) -> Option<Span> {
+        let (width, content) = self.viewport?;
+        let span = Span { track: Rect::new(0.0, self.height - size::SCROLLBAR_WIDTH, width, self.height), viewport: width, content, offset };
+        (span.max() > 0.0).then(|| Span { offset: offset.clamp(0.0, span.max()), ..span })
     }
 
     pub fn action_at(&self, p: Point) -> Option<&Action> {
@@ -75,7 +84,18 @@ impl Drawing {
         }
     }
 
-    pub fn paint(&self, painter: &mut Painter<'_>, x: f64, y: f64, palette: &[Brush], hover: Option<usize>, search: Option<&crate::ui::editor::Search>) {
+    pub fn paint(&self, painter: &mut Painter<'_>, x: f64, y: f64, palette: &[Brush], hover: Option<usize>, search: Option<&crate::ui::editor::Search>, scroll_x: f64) {
+        if let Some(mut span) = self.scroll_span(scroll_x) {
+            let clip = Rect::new(x, y, x + span.viewport, y + span.track.y0);
+            painter.with_fill_clip(clip, |painter| self.paint_content(painter, x - span.offset, y, palette, hover, search));
+            span.track = span.track + masonry::kurbo::Vec2::new(x, y);
+            Scrollbar::new(Axis::Horizontal).paint(painter, &span);
+        } else {
+            self.paint_content(painter, x, y, palette, hover, search);
+        }
+    }
+
+    fn paint_content<S: PaintSink + ?Sized>(&self, painter: &mut Painter<'_, S>, x: f64, y: f64, palette: &[Brush], hover: Option<usize>, search: Option<&crate::ui::editor::Search>) {
         let at = Affine::translate((x, y));
         let hover = hover.and_then(|i| self.hits.get(i)).map(|(r, ..)| *r);
         let mut seen = 0;

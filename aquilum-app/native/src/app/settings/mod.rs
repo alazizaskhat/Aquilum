@@ -55,11 +55,15 @@ impl App {
         let home_page = known.as_ref().map(|known| known.home_page.clone()).unwrap_or_default();
         let large = self.workspace.core.sync.large().into_iter();
         let sync_large = large.filter(|large| workspace.as_deref().is_some_and(|root| root.join(&large.path).exists())).collect();
+        let client_api_config = Some(self.workspace.core.client_api.settings(workspace.as_deref()));
         Context {
             workspace,
             scale: self.interface.scale(),
             home_page,
             mcp: Some(self.workspace.core.mcp.status()),
+            client_api_config,
+            client_api_status: self.workspace.core.client_api.status(),
+            client_api_clients: self.workspace.core.client_api.clients(),
             copied,
             trash_page,
             autostart: crate::autostart::available().then(crate::autostart::enabled),

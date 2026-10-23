@@ -40,6 +40,7 @@ impl TextEditor {
             table_scrolls: std::collections::HashMap::new(),
             clips: Vec::new(),
             code_bar: None,
+            drawing_bar: None,
             copied: None,
             media: media::MediaState::default(),
             videos: crate::video::Owned::default(),

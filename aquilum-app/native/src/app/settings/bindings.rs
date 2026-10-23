@@ -159,6 +159,7 @@ pub(super) fn same_setter(a: Setter, b: Setter) -> bool {
     match (a, b) {
         (Setter::Config(x), Setter::Config(y)) => std::ptr::fn_addr_eq(x, y),
         (Setter::VaultSync(x), Setter::VaultSync(y)) => std::ptr::fn_addr_eq(x, y),
+        (Setter::ClientApi(x), Setter::ClientApi(y)) => x == y,
         (Setter::Scale, Setter::Scale) | (Setter::HomePage, Setter::HomePage) | (Setter::Autostart, Setter::Autostart) => true,
         _ => false,
     }

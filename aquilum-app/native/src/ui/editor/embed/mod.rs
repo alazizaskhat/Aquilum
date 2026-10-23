@@ -2,6 +2,7 @@ mod book;
 mod dataview;
 mod drawing;
 mod math;
+mod mermaid;
 pub mod media;
 mod metrics;
 pub mod panel;
@@ -17,6 +18,7 @@ pub use book::{Row as BookRow, books};
 pub use dataview::dataview;
 pub use drawing::{Action, Drawing};
 pub use math::{Formula, formula, math};
+pub use mermaid::mermaid;
 pub use media::{MediaHit, MediaOverlay, MediaView};
 pub use spec::{Font, Spec};
 
@@ -47,7 +49,7 @@ impl View {
         match self {
             View::Table(t) => t.paint(painter, x, y, palette, overlay),
             View::Media(m) => m.paint(painter, x, y, media),
-            View::Drawing(d) => d.paint(painter, x, y, palette, hover, overlay.search.as_ref()),
+            View::Drawing(d) => d.paint(painter, x, y, palette, hover, overlay.search.as_ref(), overlay.scroll_x),
         }
     }
 }

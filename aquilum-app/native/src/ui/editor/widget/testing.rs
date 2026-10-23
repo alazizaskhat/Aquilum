@@ -1,6 +1,14 @@
 use super::*;
 
 impl TextEditor {
+    pub fn drawing_scroll_state(&self) -> Option<(Rect, f64)> {
+        self.doc.paragraphs().find_map(|p| {
+            let (drawing, origin) = self.drawing_geometry(p.start)?;
+            let span = drawing.scroll_span(self.table_scroll_x(p.start))?;
+            Some((span.track + origin, span.offset))
+        })
+    }
+
     pub fn selected(&self) -> String {
         self.selected_text().unwrap_or_default()
     }

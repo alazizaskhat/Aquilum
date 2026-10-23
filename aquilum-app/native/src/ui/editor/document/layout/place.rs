@@ -13,7 +13,7 @@ impl Document {
         let all = !self.placed;
         let len = self.lines.count();
         let (mut i, until) = if all { (0, len) } else { (from.min(len.saturating_sub(1)), until.min(len)) };
-        while i > 0 && (self.heights.fold(i) == Fold::Member || self.inside(i) && matches!(self.blocks.get(i).1, Block::Code { first: false, lang: Some(Lang::Math), .. })) {
+        while i > 0 && (self.heights.fold(i) == Fold::Member || self.inside(i) && matches!(self.blocks.get(i).1, Block::Code { first: false, lang: Some(Lang::Math | Lang::Mermaid), .. })) {
             i -= 1;
         }
         let mut top = self.top(i);

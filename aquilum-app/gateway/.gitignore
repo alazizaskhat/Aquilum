@@ -1,0 +1,7 @@
+/target/
+/dist/
+/config.json
+/secrets/
+/logs/
+/data/
+*.log

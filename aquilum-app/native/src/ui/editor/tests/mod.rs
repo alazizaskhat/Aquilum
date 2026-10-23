@@ -5,6 +5,7 @@ mod images;
 mod input;
 mod keys;
 mod lists;
+mod mermaid;
 mod nesting;
 mod numbering;
 mod quotes;

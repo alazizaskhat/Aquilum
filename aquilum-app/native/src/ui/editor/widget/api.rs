@@ -65,6 +65,7 @@ impl TextEditor {
         widget.history = Default::default();
         widget.refind(&[]);
         widget.table_scrolls.clear();
+        widget.drawing_bar = None;
         widget.compose = None;
         widget.extra_cursors.clear();
         widget.media = Default::default();

@@ -66,7 +66,8 @@ impl TextEditor {
                 self.close_suggest();
                 let point = ctx.local_position(state.position);
                 let new_tab = crate::ui::keymap::action(state.modifiers);
-                if self.table_press(ctx, point, state.modifiers.shift(), new_tab, state.count)
+                if self.drawing_press(ctx, point)
+                    || self.table_press(ctx, point, state.modifiers.shift(), new_tab, state.count)
                     || self.media_press(ctx, point, state.count)
                     || self.code_press(ctx, point)
                     || self.card_click(ctx, point, new_tab)
@@ -92,7 +93,7 @@ impl TextEditor {
             PointerEvent::Move(PointerUpdate { current, .. }) => {
                 let point = ctx.local_position(current.position);
                 self.hover_text(ctx, point);
-                if self.media_move(ctx, point) || self.table_move(ctx, point) || self.code_drag(ctx, point) || !ctx.is_active() || self.table_active() {
+                if self.drawing_drag(ctx, point) || self.media_move(ctx, point) || self.table_move(ctx, point) || self.code_drag(ctx, point) || !ctx.is_active() || self.table_active() {
                     return;
                 }
                 self.drag_select(point);
@@ -114,6 +115,7 @@ impl TextEditor {
                 self.media_release(ctx);
                 self.table_release(ctx);
                 self.code_release();
+                self.drawing_bar = None;
             }
             PointerEvent::Leave(_) => {
                 self.media_leave(ctx);
@@ -128,7 +130,7 @@ impl TextEditor {
                 let point = ctx.local_position(scroll.state.position);
                 let d = crate::ui::scroll::pixels(&scroll.delta, ctx.scale_factor(), ctx.content_box().width());
                 let dx = crate::ui::scroll::sideways(d, scroll.state.modifiers.shift());
-                if dx != 0.0 && (self.table_scroll(ctx, point, -dx) || self.code_scroll(ctx, point, -dx)) {
+                if dx != 0.0 && (self.drawing_scroll(ctx, point, -dx) || self.table_scroll(ctx, point, -dx) || self.code_scroll(ctx, point, -dx)) {
                     ctx.set_handled();
                 }
             }

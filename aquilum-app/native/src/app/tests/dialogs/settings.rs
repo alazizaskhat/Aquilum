@@ -195,3 +195,39 @@ fn trash_section_empties_deleted_notes_with_their_history_only_after_confirmatio
     let h = wiped_after_confirmation(Section::Trash, Wipe::Trash, "a.md", ".trash/.aquilum/history/Старая.md/1_dev_me.md");
     assert_eq!(std::fs::read_dir(h.vault.path().join(".trash")).unwrap().count(), 0);
 }
+
+#[test]
+fn backend_settings_start_restart_revoke_and_stop_the_embedded_server() {
+    use aquilum_core::client_api::{ClientApiConfig, ClientApiField};
+    use crate::ui::settings::controls::Changed;
+    use crate::ui::settings::schema::Setter;
+    let mut h = Harness::new();
+    let core = h.app.workspace.core.clone();
+    core.client_api.configure(&core, |config| config.bind.set_port(0)).unwrap();
+    assert!(wait_until(400, 10, || !core.client_api.status().busy));
+    core.client_api.create_token("phone", &h._data.path().join("phone.token")).unwrap();
+    h.app.open_settings(&mut h.root);
+    let _ = h.root.redraw();
+    h.open_section(Section::Backend);
+    let enabled = h.binding("backend enable switch", |binding| matches!(binding, Binding::Switch(Setter::ClientApi(ClientApiField::Enabled))));
+    h.act(enabled, Changed::Bool(true));
+    assert!(wait_until(400, 10, || { h.step(); !core.client_api.status().busy }));
+    assert!(core.client_api.status().running);
+    assert!(ClientApiConfig::load(core.client_api.config_path()).unwrap().enabled);
+    assert_eq!(h.section(), Some(Section::Backend));
+    let restart = h.binding("backend restart", |binding| matches!(binding, Binding::Button(Action::BackendRestart)));
+    h.act(restart, crate::ui::widgets::Pressed);
+    assert!(wait_until(400, 10, || { h.step(); !core.client_api.status().busy }));
+    assert!(core.client_api.status().running);
+    let revoke = h.binding("phone revoke", |binding| matches!(binding, Binding::Button(Action::BackendRevokeToken(name)) if name == "phone"));
+    h.act(revoke, crate::ui::widgets::Pressed);
+    assert!(!core.client_api.clients()[0].enabled);
+    let address = core.client_api.status().address.unwrap();
+    let enabled = h.binding("backend disable switch", |binding| matches!(binding, Binding::Switch(Setter::ClientApi(ClientApiField::Enabled))));
+    h.act(enabled, Changed::Bool(false));
+    assert!(wait_until(400, 10, || { h.step(); !core.client_api.status().busy }));
+    assert!(!core.client_api.status().running);
+    assert!(!ClientApiConfig::load(core.client_api.config_path()).unwrap().enabled);
+    assert!(std::net::TcpListener::bind(address).is_ok());
+    assert_eq!(h.section(), Some(Section::Backend));
+}

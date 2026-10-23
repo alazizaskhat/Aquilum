@@ -51,6 +51,7 @@ impl TextEditor {
             session.start = map(session.start);
         }
         self.table_scrolls = self.table_scrolls.drain().map(|(start, x)| (map(start), x)).collect();
+        self.drawing_bar = self.drawing_bar.map(|(start, bar)| (map(start), bar));
         self.hovered_table = self.hovered_table.map(map);
         self.hovered_link = self.hovered_link.map(|(start, hit)| (map(start), hit));
         self.unit = self.unit.take().map(|(count, range)| (count, map(range.start)..map(range.end)));

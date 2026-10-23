@@ -83,6 +83,16 @@ pub use args::Args;
 const WORKERS: usize = 4;
 
 fn main() {
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if matches!(arguments.first().map(String::as_str), Some("--api-token-create" | "--api-token-revoke")) {
+        let result = workspace::data_dir_or_default(None)
+            .and_then(|data| aquilum_core::client_api::token_command(&data, &arguments));
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+        return;
+    }
     #[cfg(target_os = "windows")]
     unsafe {
         #[link(name = "winmm")]

@@ -5,6 +5,37 @@ impl App {
         let core = &self.workspace.core;
         let workspace = self.tree.root().map(Path::to_path_buf);
         match action {
+            Action::BackendRestart => {
+                if let Err(error) = core.client_api.request_apply(core) { core.client_api.record_error(error); }
+                Effect::Content
+            }
+            Action::BackendRefresh => Effect::Content,
+            Action::BackendChooseWorkspace => {
+                let config = core.client_api.settings(workspace.as_deref());
+                let mut picker = rfd::FileDialog::new().set_title(t("settings.backend.chooseFolder"));
+                if config.workspace.is_dir() { picker = picker.set_directory(&config.workspace); }
+                if let Some(path) = picker.pick_folder() {
+                    let _ = core.client_api.configure(core, |config| config.workspace = path);
+                }
+                Effect::Content
+            }
+            Action::BackendCreateToken => {
+                let filename = format!("device-{}.token", chrono::Local::now().format("%Y%m%d-%H%M%S"));
+                let directory = core.client_api.config_path().parent().unwrap_or(Path::new("."));
+                let _ = std::fs::create_dir_all(directory);
+                if let Some(path) = rfd::FileDialog::new().set_title(t("settings.backend.saveToken")).set_directory(directory).set_file_name(&filename).save_file() {
+                    let stem = path.file_stem().and_then(|name| name.to_str()).unwrap_or("device");
+                    let name = if !stem.is_empty() && stem.len() <= 64 && stem.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte)) {
+                        stem.to_owned()
+                    } else { format!("device-{}", uuid::Uuid::new_v4().simple()) };
+                    let _ = core.client_api.create_token(&name, &path);
+                }
+                Effect::Content
+            }
+            Action::BackendRevokeToken(name) => {
+                let _ = core.client_api.revoke_token(&name);
+                Effect::Content
+            }
             Action::OpenTrash => {
                 if let Some(workspace) = workspace {
                     match ensure_trash_impl(&workspace) {
@@ -95,6 +126,24 @@ impl App {
 
     pub(super) fn apply(&mut self, setter: Setter, value: Value) -> Effect {
         match setter {
+            Setter::ClientApi(field) => {
+                use aquilum_core::client_api::ClientApiField;
+                let core = &self.workspace.core;
+                let workspace = self.tree.root().map(Path::to_path_buf);
+                let _ = core.client_api.configure(core, |config| {
+                    if config.workspace.as_os_str().is_empty() && let Some(workspace) = workspace { config.workspace = workspace; }
+                    match (field, value) {
+                        (ClientApiField::Enabled, Value::Bool(enabled)) => config.enabled = enabled,
+                        (ClientApiField::Port, Value::Number(port)) => config.bind.set_port(port as u16),
+                        (ClientApiField::Workspace, Value::Text(path)) => config.workspace = Path::new(path.trim()).to_path_buf(),
+                        (ClientApiField::RequestsPerMinute, Value::Number(limit)) => config.requests_per_minute = limit as u32,
+                        (ClientApiField::Burst, Value::Number(limit)) => config.burst = limit as u32,
+                        (ClientApiField::Origins, Value::Text(origins)) => config.allowed_origins = origins.split(|ch: char| ch == ',' || ch.is_whitespace()).filter(|origin| !origin.is_empty()).map(str::to_owned).collect(),
+                        _ => {},
+                    }
+                });
+                Effect::Content
+            }
             Setter::Scale => {
                 let Value::Number(percent) = value else { return Effect::None };
                 if self.interface.set_scale(percent / 100.0) { Effect::Rescale } else { Effect::None }

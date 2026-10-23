@@ -44,6 +44,7 @@ impl Lang {
             "sh" | "bash" | "zsh" | "shell" | "ps1" | "powershell" | "bat" => Lang::Shell,
             "sql" => Lang::Sql,
             "dataview" | "dataviewjs" => Lang::Dataview,
+            "mermaid" | "mmd" => Lang::Mermaid,
             "css" | "scss" | "less" => Lang::Css,
             "json" | "jsonc" => Lang::Json,
             "yaml" | "yml" | "toml" | "ini" => Lang::Yaml,
@@ -64,7 +65,7 @@ impl Lang {
             Lang::Sql => SQL,
             Lang::Lua => LUA,
             Lang::Dataview => DATAVIEW,
-            Lang::Css | Lang::Json | Lang::Yaml | Lang::Markup | Lang::Math => &[],
+            Lang::Css | Lang::Json | Lang::Yaml | Lang::Markup | Lang::Math | Lang::Mermaid => &[],
         }
     }
 
@@ -73,6 +74,7 @@ impl Lang {
             Lang::Python | Lang::Shell | Lang::Yaml => &["#"],
             Lang::Sql | Lang::Lua => &["--"],
             Lang::Dataview => &["//"],
+            Lang::Mermaid => &["%%"],
             Lang::Markup => &["<!--"],
             Lang::Json => &[],
             _ => &["//", "/*"],
