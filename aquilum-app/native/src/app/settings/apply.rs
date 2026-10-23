@@ -31,6 +31,12 @@ impl App {
                 }
                 Effect::Content
             }
+            Action::ConnectionOrganize => {
+                if let Some(workspace) = workspace {
+                    core.connections.start(core, aquilum_core::connections::Job::Organize { workspace });
+                }
+                Effect::Content
+            }
             Action::ConnectionDisconnect => { core.connections.disconnect(); Effect::Content }
             Action::ConnectionShowFolder => {
                 if let Some(path) = core.connections.status().destination { system::open(&path.to_string_lossy()); }

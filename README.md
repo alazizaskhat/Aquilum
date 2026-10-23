@@ -128,7 +128,7 @@ Trash is one layer of a broader recovery model. Note history handles edits insid
 - Searchable templates that can be applied to the open note or used for a new one, with date and time placeholders and starter note and book templates.
 - Images and videos pasted or imported into local attachments, with image cropping inside the editor.
 - Multiple independent vaults, each with its own index.
-- Connect to another Aquilum desktop over HTTPS, browse and read its notes, and copy selected notes or all Markdown notes into a new local folder. See [connection setup and limits](CLIENT_API.md#connect-another-aquilum-desktop).
+- Connect to another Aquilum desktop over HTTPS, browse and read its notes, and copy selected notes or all Markdown notes while preserving their original folder structure. See [connection setup and limits](CLIENT_API.md#connect-another-aquilum-desktop).
 - Note history with edit sources, visual diffs, named versions, full-version restore, and reversal of an individual change.
 - Trash with configurable retention and restoration of notes and folders to their previous location.
 - External changes are detected and merged safely; when an unambiguous merge is impossible, Aquilum preserves the disputed content in a conflict copy.

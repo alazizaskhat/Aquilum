@@ -82,6 +82,7 @@ pub enum Action {
     ConnectionRead(String, usize),
     ConnectionBack,
     ConnectionCopy(Option<String>),
+    ConnectionOrganize,
     ConnectionDisconnect,
     ConnectionShowFolder,
 }

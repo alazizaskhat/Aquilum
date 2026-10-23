@@ -105,6 +105,17 @@ pub(super) fn connections(ctx: &Context) -> Vec<Block> {
             )]),
         ),
     ];
+    if ctx
+        .workspace
+        .as_deref()
+        .is_some_and(|root| aquilum_core::connections::legacy_count(root) > 0)
+    {
+        rows.push(info(
+            t("settings.connections.organize"),
+            Some(t("settings.connections.organizeHint")),
+            Control::Buttons(vec![button("organize", Action::ConnectionOrganize, idle)]),
+        ));
+    }
     rows.extend(operation_rows(s));
     let mut blocks = vec![Block {
         title: t("settings.connections.section"),
@@ -179,7 +190,18 @@ fn operation_rows(s: &Status) -> Vec<Row> {
                 "settings.connections.copied",
                 &[("count", &s.copied.to_string())],
             ),
-            Some(destination.display().to_string()),
+            Some(format!(
+                "{}\n{}",
+                destination.display(),
+                t_with(
+                    "settings.connections.copyDetails",
+                    &[
+                        ("skipped", &s.skipped.to_string()),
+                        ("conflicts", &s.conflicts.to_string()),
+                        ("folders", &s.organized.to_string()),
+                    ]
+                )
+            )),
             Control::Buttons(vec![button(
                 "showFolder",
                 Action::ConnectionShowFolder,

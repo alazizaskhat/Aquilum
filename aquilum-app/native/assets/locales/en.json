@@ -536,7 +536,7 @@
       "connect": "Connect / Refresh",
       "disconnect": "Disconnect / Cancel",
       "copyAll": "Copy all notes",
-      "copyHint": "Copies Markdown notes into a new Imported folder in the current vault. Existing notes stay intact. Attachments, history and automatic sync are not included. Both PCs must be online with Aquilum running.",
+      "copyHint": "Copies Markdown notes into their original folders in the current local vault. Identical notes are skipped; differing local notes are kept, with remote versions saved beside them. Attachments and automatic sync are not included.",
       "error": "Connection error",
       "copied": "Copied {{count}} notes",
       "showFolder": "Show folder",
@@ -550,7 +550,10 @@
       "readOnly": "Read-only remote preview. Refresh to fetch the latest text.",
       "refresh": "Refresh",
       "preview": "Remote note",
-      "back": "Back to notes"
+      "back": "Back to notes",
+      "organize": "Organize previous copies",
+      "organizeHint": "Combines all old Imported-… folders into the original folder tree in this vault. Differing versions are kept. After verification, old folders move to Trash and can be restored. No connection is needed.",
+      "copyDetails": "{{skipped}} already present · {{conflicts}} differing versions kept · {{folders}} old folders moved to Trash"
     }
   },
   "window": {

@@ -117,12 +117,17 @@ fn connections_browse_read_refresh_copy_complete_unicode_notes_and_revoke_access
     let s = wait(&p.guest);
     assert!(s.error.is_none(), "{:?}", s.error);
     assert_eq!(s.copied, 2);
+    assert_eq!(s.conflicts, 1);
     let imported = s.destination.unwrap();
+    assert_eq!(imported, p.local.canonicalize().unwrap());
     assert_eq!(
         fs::read_to_string(imported.join("Проекты/Пример.md")).unwrap(),
         content
     );
-    assert_eq!(fs::read_to_string(imported.join("Empty.md")).unwrap(), "");
+    assert_eq!(
+        fs::read_to_string(imported.join("Empty (remote copy).md")).unwrap(),
+        ""
+    );
     assert_eq!(
         fs::read_to_string(p.local.join("Empty.md")).unwrap(),
         "keep local work"
@@ -144,11 +149,22 @@ fn connections_browse_read_refresh_copy_complete_unicode_notes_and_revoke_access
     );
     let s = wait(&p.guest);
     assert_eq!(s.copied, 1);
-    assert_ne!(s.destination.as_ref().unwrap(), &imported);
+    assert_eq!(s.destination.as_ref().unwrap(), &imported);
     assert_eq!(
-        fs::read_to_string(s.destination.unwrap().join("Empty.md")).unwrap(),
+        fs::read_to_string(s.destination.unwrap().join("Empty (remote copy 2).md")).unwrap(),
         "latest remote text"
     );
+    p.guest.connections.start(
+        &p.guest,
+        Job::Copy {
+            workspace: p.local.clone(),
+            note: None,
+        },
+    );
+    let s = wait(&p.guest);
+    assert!(s.error.is_none(), "{:?}", s.error);
+    assert_eq!((s.copied, s.skipped), (0, 2));
+    assert_eq!(legacy_count(&p.local), 0);
     let saved = fs::read_to_string(&p.guest.connections.path).unwrap();
     assert!(!saved.contains(&fs::read_to_string(&p.token).unwrap()));
     p.host.client_api.revoke_token("guest").unwrap();
@@ -314,4 +330,201 @@ fn oversized_snapshot_is_refused_without_creating_a_truncated_note() {
     assert!(s.error.is_some());
     assert_eq!(s.copied, 0);
     assert!(!s.destination.unwrap().join("Large.md").exists());
+}
+
+#[test]
+fn individual_copies_share_the_original_tree_and_full_path_links_resolve() {
+    let p = Pair::new();
+    let folder = "Learning/AI Engineering/Module 01";
+    let overview = format!("{folder}/Overview.md");
+    let week = format!("{folder}/Week 01.md");
+    fs::create_dir_all(p.root.join(folder)).unwrap();
+    let link = format!("[[{folder}/Week 01]]");
+    fs::write(p.root.join(&overview), &link).unwrap();
+    fs::write(p.root.join(&week), "# Week 01\r\nStudy notes\r\n").unwrap();
+    for path in [&overview, &week, &week] {
+        p.guest.connections.start(
+            &p.guest,
+            Job::Copy {
+                workspace: p.local.clone(),
+                note: Some(path.clone()),
+            },
+        );
+        let s = wait(&p.guest);
+        assert!(s.error.is_none(), "{:?}", s.error);
+        assert_eq!(s.destination.unwrap(), p.local.canonicalize().unwrap());
+    }
+    assert_eq!(
+        (
+            p.guest.connections.status().copied,
+            p.guest.connections.status().skipped
+        ),
+        (0, 1)
+    );
+    assert_eq!(fs::read_to_string(p.local.join(&overview)).unwrap(), link);
+    assert_eq!(
+        fs::read_to_string(p.local.join(&week)).unwrap(),
+        "# Week 01\r\nStudy notes\r\n"
+    );
+    assert_eq!(legacy_count(&p.local), 0);
+    let workspace = p.local.to_string_lossy();
+    p.guest.search.prepare(&workspace).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let resolved = p
+            .guest
+            .search
+            .resolve_wiki_links(
+                &workspace,
+                &p.local.join(&overview).to_string_lossy(),
+                &[format!("{folder}/Week 01")],
+            )
+            .unwrap();
+        if resolved.complete {
+            assert_eq!(resolved.paths.len(), 1);
+            assert!(crate::search::paths::same_path(
+                Path::new(resolved.paths[0].as_ref().unwrap()),
+                &p.local.join(&week)
+            ));
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn organize_combines_legacy_imports_offline_and_preserves_versions_and_restorable_originals() {
+    let p = Pair::new();
+    let relative = "Learning/AI Engineering/Module 01/Week 01.md";
+    let mut originals = Vec::new();
+    for (id, content) in [
+        (1, "remote version A"),
+        (2, "remote version B"),
+        (3, "remote version A"),
+    ] {
+        let folder = p.local.join(format!("Imported-{id:032x}"));
+        fs::create_dir_all(folder.join("Learning/AI Engineering/Module 01")).unwrap();
+        fs::write(folder.join(relative), content).unwrap();
+        originals.push(folder);
+    }
+    fs::create_dir_all(p.local.join("Learning/AI Engineering/Module 01")).unwrap();
+    fs::write(p.local.join(relative), "my local edits").unwrap();
+    p.guest.connections.configure(|c| {
+        c.address.clear();
+        c.token_file = None;
+    });
+    assert_eq!(legacy_count(&p.local), 3);
+    p.guest.connections.start(
+        &p.guest,
+        Job::Organize {
+            workspace: p.local.clone(),
+        },
+    );
+    let s = wait(&p.guest);
+    assert!(s.error.is_none(), "{:?}", s.error);
+    assert_eq!(
+        (s.copied, s.skipped, s.conflicts, s.organized),
+        (2, 1, 2, 3)
+    );
+    assert_eq!(legacy_count(&p.local), 0);
+    assert!(originals.iter().all(|p| !p.exists()));
+    assert_eq!(
+        fs::read_to_string(p.local.join(relative)).unwrap(),
+        "my local edits"
+    );
+    assert_eq!(
+        fs::read_to_string(
+            p.local
+                .join("Learning/AI Engineering/Module 01/Week 01 (remote copy).md")
+        )
+        .unwrap(),
+        "remote version A"
+    );
+    assert_eq!(
+        fs::read_to_string(
+            p.local
+                .join("Learning/AI Engineering/Module 01/Week 01 (remote copy 2).md")
+        )
+        .unwrap(),
+        "remote version B"
+    );
+    let trash = crate::files::deletions::deletion_page_impl(&p.local, 0, 100).unwrap();
+    assert_eq!(trash.total, 3);
+    let first = trash
+        .deletions
+        .iter()
+        .find(|d| d.original.contains(&format!("Imported-{:032x}", 1)))
+        .unwrap();
+    crate::files::gate::restore_deletion(&p.guest, &p.local, &first.id).unwrap();
+    assert_eq!(
+        fs::read_to_string(originals[0].join(relative)).unwrap(),
+        "remote version A"
+    );
+}
+
+#[test]
+fn organize_leaves_imports_with_attachments_in_place_instead_of_discarding_files() {
+    let p = Pair::new();
+    let folder = p.local.join(format!("Imported-{:032x}", 1));
+    fs::create_dir(&folder).unwrap();
+    fs::write(folder.join("Note.md"), "![image](image.png)").unwrap();
+    fs::write(folder.join("image.png"), b"image bytes").unwrap();
+    p.guest.connections.start(
+        &p.guest,
+        Job::Organize {
+            workspace: p.local.clone(),
+        },
+    );
+    let s = wait(&p.guest);
+    assert!(s.error.unwrap().contains("left in place"));
+    assert_eq!(s.organized, 0);
+    assert!(folder.join("Note.md").exists());
+    assert!(folder.join("image.png").exists());
+    assert!(!p.local.join("Note.md").exists());
+}
+
+#[test]
+fn organize_keeps_the_original_folder_when_a_note_changes_during_copying() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("local");
+    let data = dir.path().join("data");
+    let folder = root.join(format!("Imported-{:032x}", 1));
+    fs::create_dir_all(&folder).unwrap();
+    fs::create_dir_all(&data).unwrap();
+    let original = folder.join("Note.md");
+    fs::write(&original, "before").unwrap();
+    let target = root.canonicalize().unwrap().join("Note.md");
+    let changed = original.clone();
+    let guest = Core::open(
+        &data,
+        Arc::new(move |event| match event {
+            CoreEvent::Settle(done) => {
+                let _ = done.send(());
+            }
+            CoreEvent::WorkspaceChanged(paths) if paths.iter().any(|p| Path::new(p) == target) => {
+                fs::write(&changed, "edited while organizing").unwrap();
+            }
+            _ => (),
+        }),
+    );
+    guest
+        .ui_state
+        .resolve_workspace(&root.to_string_lossy(), 0)
+        .unwrap();
+    guest.connections.start(
+        &guest,
+        Job::Organize {
+            workspace: root.clone(),
+        },
+    );
+    let s = wait(&guest);
+    assert!(s.error.unwrap().contains("changed while being organized"));
+    assert_eq!(s.organized, 0);
+    assert_eq!(
+        fs::read_to_string(original).unwrap(),
+        "edited while organizing"
+    );
+    assert_eq!(fs::read_to_string(root.join("Note.md")).unwrap(), "before");
+    guest.shutdown();
 }

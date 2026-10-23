@@ -69,6 +69,9 @@ fn snapshot_connections() {
     let _theme = crate::ui::theme::test_lock();
     let vault = crate::test_dir::tempdir();
     let data = crate::test_dir::tempdir();
+    let old_import = vault.path().join(format!("Imported-{:032x}", 1));
+    std::fs::create_dir_all(&old_import).unwrap();
+    std::fs::write(old_import.join("Example.md"), "# Earlier copy").unwrap();
     for language in ["en", "ru"] {
         crate::i18n::set_language(language);
         for mode in ["light", "dark"] {

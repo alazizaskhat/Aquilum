@@ -1,15 +1,17 @@
 //! Read-only device connections. Credentials stay in the user-selected token file.
 mod client;
+mod organize;
 #[cfg(test)]
 mod tests;
+mod transfer;
 
 use crate::{
     app_core::{Core, CoreEvent},
-    files::{document::write_content_atomic, gate},
-    history::Source,
+    files::document::write_content_atomic,
 };
 use client::Client;
 pub use client::{Note, PAGE, PREVIEW};
+pub use organize::legacy_count;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
@@ -19,6 +21,7 @@ use std::{
         Arc, Mutex,
     },
 };
+use transfer::Imported;
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct Config {
@@ -40,6 +43,9 @@ pub struct Status {
     pub preview_offset: usize,
     pub error: Option<String>,
     pub copied: usize,
+    pub skipped: usize,
+    pub conflicts: usize,
+    pub organized: usize,
     pub destination: Option<PathBuf>,
 }
 
@@ -49,6 +55,9 @@ pub enum Job {
     Copy {
         workspace: PathBuf,
         note: Option<String>,
+    },
+    Organize {
+        workspace: PathBuf,
     },
 }
 
@@ -153,12 +162,23 @@ impl Connections {
             self.cancelled.store(false, Ordering::SeqCst);
             state.busy = true;
             state.error = None;
+            if matches!(job, Job::Copy { .. } | Job::Organize { .. }) {
+                state.copied = 0;
+                state.skipped = 0;
+                state.conflicts = 0;
+                state.organized = 0;
+                state.destination = None;
+            }
             state.clone()
         };
         core.emit(CoreEvent::ConnectionsChanged);
         let core = Arc::clone(core);
         std::thread::spawn(move || {
+            let networking = !matches!(job, Job::Organize { .. });
             let result = (|| {
+                if let Job::Organize { workspace } = &job {
+                    return core.connections.organize(&core, workspace);
+                }
                 let token = snapshot
                     .config
                     .token_file
@@ -175,7 +195,9 @@ impl Connections {
             state.busy = false;
             if let Err(error) = result {
                 state.error = Some(error);
-                state.connected = false;
+                if networking {
+                    state.connected = false;
+                }
             }
             drop(state);
             core.emit(CoreEvent::ConnectionsChanged);
@@ -237,8 +259,7 @@ impl Connections {
                     return Err("There are no notes to copy".into());
                 }
                 self.check_cancelled()?;
-                let destination = root.join(format!("Imported-{}", uuid::Uuid::new_v4().simple()));
-                std::fs::create_dir(&destination).map_err(|e| e.to_string())?;
+                let destination = root;
                 {
                     let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
                     state.copied = 0;
@@ -256,11 +277,8 @@ impl Connections {
                     }
                     let note = client.export(&path)?;
                     self.check_cancelled()?;
-                    let target = destination.join(&path);
-                    safe_parents(&destination, &target)?;
-                    gate::create(core, &target, &note.content, Source::Me, None)
-                        .map_err(|e| e.to_string())?;
-                    self.state.lock().unwrap_or_else(|e| e.into_inner()).copied += 1;
+                    let result = transfer::import(core, &destination, &path, &note.content)?;
+                    self.record_import(result);
                     core.emit(CoreEvent::ConnectionsChanged);
                 }
                 self.state
@@ -268,6 +286,7 @@ impl Connections {
                     .unwrap_or_else(|e| e.into_inner())
                     .connected = true;
             }
+            Job::Organize { workspace } => self.organize(core, &workspace)?,
         }
         Ok(())
     }
@@ -286,34 +305,6 @@ fn validate_listing(list: &client::Listing, offset: usize) -> Result<(), String>
     }
     for path in &list.notes {
         client::note_path(path)?;
-    }
-    Ok(())
-}
-
-fn safe_parents(root: &Path, target: &Path) -> Result<(), String> {
-    let parent = target.parent().ok_or("Invalid destination")?;
-    let mut at = root.to_path_buf();
-    for part in parent
-        .strip_prefix(root)
-        .map_err(|_| "Invalid destination")?
-        .components()
-    {
-        at.push(part);
-        match std::fs::create_dir(&at) {
-            Ok(()) => (),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
-            Err(e) => return Err(e.to_string()),
-        }
-        let meta = std::fs::symlink_metadata(&at).map_err(|e| e.to_string())?;
-        if meta.file_type().is_symlink()
-            || !meta.is_dir()
-            || !at
-                .canonicalize()
-                .map_err(|e| e.to_string())?
-                .starts_with(root)
-        {
-            return Err("Copy destination contains a link outside the import folder".into());
-        }
     }
     Ok(())
 }

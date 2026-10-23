@@ -76,7 +76,7 @@ fn connections_dialog_browses_reads_and_copies_through_the_backend() {
     assert!(wait_until(400, 10, || { h.step(); !core.connections.status().busy }));
     let status = core.connections.status();
     assert!(status.error.is_none(), "{:?}", status.error);
-    assert_eq!(status.copied, 1);
+    assert_eq!((status.copied, status.skipped), (0, 1));
     assert_eq!(std::fs::read(status.destination.unwrap().join("a.md")).unwrap(), std::fs::read(h.vault.path().join("a.md")).unwrap());
     let back = h.binding("back", |b| matches!(b, Binding::Button(Action::ConnectionBack)));
     h.act(back, crate::ui::widgets::Pressed);
@@ -84,6 +84,29 @@ fn connections_dialog_browses_reads_and_copies_through_the_backend() {
     let disconnect = h.binding("disconnect", |b| matches!(b, Binding::Button(Action::ConnectionDisconnect)));
     h.act(disconnect, crate::ui::widgets::Pressed);
     assert!(!core.connections.status().connected);
+    assert_eq!(h.section(), Some(Section::Connections));
+}
+
+#[test]
+fn connections_dialog_organizes_fragmented_imports_without_a_remote_connection() {
+    let mut h = Harness::new();
+    let core = h.app.workspace.core.clone();
+    for id in 1..=2 {
+        let folder = h.vault.path().join(format!("Imported-{id:032x}"));
+        std::fs::create_dir_all(folder.join("Learning/Module 01")).unwrap();
+        std::fs::write(folder.join(format!("Learning/Module 01/Week {id:02}.md")), format!("# Week {id}" )).unwrap();
+    }
+    h.app.open_settings(&mut h.root);
+    h.open_section(Section::Connections);
+    let organize = h.binding("organize previous copies", |b| matches!(b, Binding::Button(Action::ConnectionOrganize)));
+    h.act(organize, crate::ui::widgets::Pressed);
+    assert!(wait_until(400, 10, || { h.step(); !core.connections.status().busy }));
+    let status = core.connections.status();
+    assert!(status.error.is_none(), "{:?}", status.error);
+    assert_eq!((status.copied, status.organized), (2, 2));
+    assert_eq!(aquilum_core::connections::legacy_count(h.vault.path()), 0);
+    assert!(h.vault.path().join("Learning/Module 01/Week 01.md").exists());
+    assert!(h.vault.path().join("Learning/Module 01/Week 02.md").exists());
     assert_eq!(h.section(), Some(Section::Connections));
 }
 
